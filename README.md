@@ -28,9 +28,16 @@ curl -H 'Authorization: Bearer YOUR_TOKEN' \
 - Docs: <https://querykey.com/docs/>
 - OpenAPI: <https://raw.githubusercontent.com/RellWilson/querykey-cases/main/openapi.v1.json>
 
-## SDKs
+## SDKs & MCP
 
-SDKs will be published under the same namespace as this repository. In the meantime, use the examples below:
+Official SDKs and the MCP server now live in this repository:
+
+- JavaScript/TypeScript SDK: ./sdks/js/
+- Python SDK: ./sdks/python/
+- Go SDK: ./sdks/go/
+- MCP Server: ./mcp/
+
+You can also browse quick examples:
 
 - cURL: ./examples/curl/search.md
 - JavaScript/TypeScript: ./examples/js/fetch.js

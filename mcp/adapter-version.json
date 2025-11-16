@@ -1,0 +1,8 @@
+{
+  "version": "0.1.0",
+  "inputs": {
+    "openapi": "openapi.v1.json",
+    "tools": "mcp/tools.mjs"
+  },
+  "lastHash": "5270fa95da102dbf594844e09c018de8c7e4f937a211076e711b713b8c4c5a3b"
+}

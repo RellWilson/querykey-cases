@@ -1,0 +1,17 @@
+{
+  "name": "querykey-mcp-server",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (MCP) server for QueryKey Cases",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "lint": "eslint . --ext .js,.mjs --max-warnings=0",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}
