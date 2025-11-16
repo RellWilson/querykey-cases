@@ -48,3 +48,4 @@ You can also browse quick examples:
 
 - Email: <mailto:support@querykey.com>
 - Security: see SECURITY.md
+- Trademarks: see TRADEMARKS.md
