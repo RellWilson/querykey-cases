@@ -13,7 +13,7 @@ curl -X POST https://api.querykey.com/v2/auth \
   -d '{"apiKey":"qk_live_your_api_key"}'
 ```
 
-2) Search for cases
+1) Search for cases
 
 
 ```bash
@@ -25,16 +25,18 @@ curl -H 'Authorization: Bearer YOUR_TOKEN' \
 
 ## Documentation and Specs
 
-- Docs: https://querykey.com/docs/
-- OpenAPI: https://raw.githubusercontent.com/RellWilson/querykey/main/openapi.v1.json
+- Docs: <https://querykey.com/docs/>
+- OpenAPI: <https://raw.githubusercontent.com/RellWilson/querykey-cases/main/openapi.v1.json>
 
 ## SDKs
 
-- JavaScript/TypeScript: https://github.com/querykey/js-sdk
-- Python: https://github.com/querykey/python-sdk
-- Go: https://github.com/querykey/go-sdk
+SDKs will be published under the same namespace as this repository. In the meantime, use the examples below:
+
+- cURL: ./examples/curl/search.md
+- JavaScript/TypeScript: ./examples/js/fetch.js
+- Python: ./examples/python/search.py
 
 ## Support
 
-- Email: support@querykey.com
+- Email: <mailto:support@querykey.com>
 - Security: see SECURITY.md
