@@ -35,6 +35,7 @@ Official SDKs and the MCP server now live in this repository:
 - JavaScript/TypeScript SDK: ./sdks/js/
 - Python SDK: ./sdks/python/
 - Go SDK: ./sdks/go/
+- PHP SDK: ./sdks/php/
 - MCP Server: ./mcp/
 
 You can also browse quick examples:
