@@ -1,0 +1,2691 @@
+openapi: 3.0.3
+info:
+  description: "API including QKey negotiation, version history, API keys (scopes,\
+    \ rotation, soft revoke), usage metering, billing stubs, plan gating, and login\
+    \ lockout mechanics."
+  title: QueryKey Cases API
+  version: 1.0.0
+servers:
+- description: Local Dev
+  url: http://localhost:8080
+tags:
+- name: auth
+- name: cases
+- name: qkey
+- name: collections
+- name: bundles
+- name: research
+- name: agents
+paths:
+  /healthz:
+    get:
+      responses:
+        "200":
+          description: OK
+      summary: Health check
+  /healthz/auth:
+    get:
+      responses:
+        "200":
+          description: Auth health payload
+      summary: Auth subsystem health
+  /api/auth/register:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_api_auth_register_post_request"
+        required: true
+      responses:
+        "200":
+          description: Registered
+      summary: Register user
+  /api/auth/login:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_api_auth_register_post_request"
+        required: true
+      responses:
+        "200":
+          description: Session established
+        "401":
+          description: Invalid credentials
+        "423":
+          description: Account temporarily locked
+      summary: Login (with lockout)
+  /api/auth/logout:
+    post:
+      responses:
+        "200":
+          description: Logged out
+      summary: Logout
+  /api/auth/me:
+    get:
+      responses:
+        "200":
+          description: Current user
+        "401":
+          description: Not authenticated
+      security:
+      - SessionCookie: []
+      summary: Session info
+  /api/auth/api-keys:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_api_auth_api_keys_get_200_response"
+          description: List returned
+        "401":
+          description: Auth required
+      security:
+      - SessionCookie: []
+      summary: List API keys
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_api_auth_api_keys_post_request"
+        required: false
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_api_auth_api_keys_post_201_response"
+          description: Key created
+        "401":
+          description: Auth required
+      security:
+      - SessionCookie: []
+      summary: Create API key
+  /api/auth/api-keys/{id}:
+    delete:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          description: Revoked (soft)
+      security:
+      - SessionCookie: []
+      summary: Soft revoke API key
+    post:
+      deprecated: true
+      responses:
+        "405":
+          description: Use /rotate subresource
+      summary: "Rotate API key (alias: /rotate)"
+  /api/auth/api-keys/{id}/rotate:
+    post:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          description: Rotated - returns new secret
+        "404":
+          description: Not found
+      security:
+      - SessionCookie: []
+      summary: Rotate API key
+  /openapi.json:
+    get:
+      responses:
+        "200":
+          description: Spec JSON
+        "304":
+          description: Not Modified
+      summary: Fetch OpenAPI spec (ETag)
+  /api/:
+    get:
+      responses:
+        "200":
+          description: Capabilities
+      summary: Capability descriptor
+  /api/billing/checkout:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_api_billing_checkout_post_request"
+        required: true
+      responses:
+        "200":
+          description: Checkout URL
+        "401":
+          description: Auth required
+      security:
+      - SessionCookie: []
+      summary: Create checkout session (mock if no Stripe)
+  /api/billing/portal:
+    get:
+      responses:
+        "200":
+          description: Portal URL
+        "401":
+          description: Auth required
+      security:
+      - SessionCookie: []
+      summary: Customer portal link (mock if no Stripe)
+  /api/billing/webhook:
+    post:
+      responses:
+        "200":
+          description: Processed & verified
+        "202":
+          description: Received but ignored (not allowlisted)
+        "400":
+          description: Signature invalid
+      summary: Billing webhook (Stripe events)
+  /api/admin/reload-config:
+    post:
+      responses:
+        "200":
+          description: Config reloaded
+        "401":
+          description: Auth required
+        "403":
+          description: Forbidden
+      summary: Reload plan & quota config
+  /api/admin/usage:
+    get:
+      parameters:
+      - description: Date in YYYY-MM-DD format
+        explode: true
+        in: query
+        name: day
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Filter results to a single user id
+        explode: true
+        in: query
+        name: user_id
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUsageResponse"
+          description: Aggregated usage
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Auth required
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+      summary: "Admin usage aggregate (today or ?day=YYYY-MM-DD, optional ?user_id=UUID)"
+  /api/admin/agent/{id}:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          description: Agent details and audits
+        "401":
+          description: Auth required
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+      summary: Get agent details and recent exempt audit events
+  /api/admin/agent/{id}/exempt/audit:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          description: Audit list
+        "401":
+          description: Auth required
+        "403":
+          description: Forbidden
+      summary: Get full audit history for agent exemption toggles
+  /api/admin/agent/{id}/exempt:
+    post:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_api_admin_agent__id__exempt_post_request"
+        required: true
+      responses:
+        "200":
+          description: Exempt toggled
+        "400":
+          description: Bad request
+        "401":
+          description: Auth required
+        "403":
+          description: Forbidden
+      summary: Set or clear agent exempt flag (admin-only)
+  /api/admin/cases:
+    get:
+      responses:
+        "200":
+          description: Cases listed
+        "401":
+          description: Auth required
+        "403":
+          description: Forbidden
+      summary: Admin list cases (recent)
+  /api/usage/me:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageSelf"
+          description: Usage detail
+        "401":
+          description: Auth required
+      security:
+      - SessionCookie: []
+      summary: Today's usage & plan limits for authenticated user
+  /api/v1/registration/challenge:
+    get:
+      description: Issue a short-lived challenge used to prove computational work
+        before registering a new agent identity. Authenticated owners receive challenges
+        tied to their account; unauthenticated callers must pass invite=true to initiate
+        the email invite flow.
+      parameters:
+      - description: Optional difficulty override; final difficulty may be clamped
+          by the server
+        explode: true
+        in: query
+        name: difficulty
+        required: false
+        schema:
+          maximum: 30
+          minimum: 1
+          type: integer
+        style: form
+      - description: Set to true when requesting a challenge for invite-based onboarding
+          without an authenticated owner session
+        explode: true
+        in: query
+        name: invite
+        required: false
+        schema:
+          type: boolean
+        style: form
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentChallenge"
+          description: Challenge issued
+        "400":
+          description: Invalid difficulty
+        "401":
+          description: Authentication required
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      - {}
+      summary: Issue Proof-of-Work challenge for agent registration
+      tags:
+      - agents
+  /api/v1/registration/agent:
+    post:
+      description: Completes the Proof-of-Work onboarding flow. Authenticated owners
+        receive an agent key immediately when capacity allows; unauthenticated callers
+        provide owner contact info and trigger an invite email for later confirmation.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentRegistrationRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentRegistrationResponse"
+          description: Agent registered
+        "400":
+          description: Invalid payload or PoW solution
+        "401":
+          description: Authentication required
+        "403":
+          description: Seat capacity or plan constraints prevented registration
+        "404":
+          description: Challenge not found
+        "409":
+          description: "Conflict: challenge already solved or public key registered"
+        "429":
+          description: Registration rate limit reached
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      - {}
+      summary: Validate PoW solution and register new agent
+      tags:
+      - agents
+  /api/v1/registration/delegated-token:
+    post:
+      description: Authenticated owners can mint a short-lived delegated token that
+        authorizes a CI/CD workflow to register an agent on their behalf.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DelegatedTokenRequest"
+        required: false
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DelegatedTokenResponse"
+          description: Delegated token issued
+        "401":
+          description: Authentication required
+        "403":
+          description: Seat capacity or plan constraints prevented issuance
+      security:
+      - SessionCookie: []
+      summary: Issue single-use delegated registration token
+      tags:
+      - agents
+  /api/v1/registration/invite/confirm:
+    post:
+      description: "Owners confirm invite tokens delivered via email, binding the\
+        \ pending agent to their account and provisioning credentials."
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentInviteConfirmationRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentRegistrationActiveResponse"
+          description: Invite confirmed and agent activated
+        "400":
+          description: Missing or invalid invite token
+        "401":
+          description: Authentication required
+        "403":
+          description: Seat capacity or plan constraints prevented activation
+        "404":
+          description: Invite token not found
+        "409":
+          description: Invite already claimed or agent inactive
+        "410":
+          description: Invite token expired
+      security:
+      - SessionCookie: []
+      summary: Confirm an agent invite and activate ownership
+      tags:
+      - agents
+  /api/v1/agents/pending:
+    get:
+      description: "Operators or invite recipients list pending owner-bound agent\
+        \ invitations with optional filters for email, pagination, and expiry state."
+      parameters:
+      - description: Include invites that have already expired.
+        explode: true
+        in: query
+        name: include_expired
+        required: false
+        schema:
+          default: true
+          type: boolean
+        style: form
+      - description: Restrict results to the provided invite email.
+        explode: true
+        in: query
+        name: email
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Page size (defaults to 50).
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          maximum: 250
+          minimum: 1
+          type: integer
+        style: form
+      - description: Offset into the pending invite list.
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          minimum: 0
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingAgentInvitesResponse"
+          description: Pending invites returned
+        "401":
+          description: Authentication required
+        "403":
+          description: Forbidden for principals without invite visibility
+      security:
+      - SessionCookie: []
+      summary: List pending agent invites
+      tags:
+      - agents
+  /api/v1/agents/{id}/invite/resend:
+    post:
+      description: "Privileged operators or the invite recipient can regenerate the\
+        \ invite token, extend expiry, and trigger the invite email delivery."
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentInviteResendResponse"
+          description: Invite resent
+        "400":
+          description: Invalid agent id
+        "401":
+          description: Authentication required
+        "403":
+          description: Forbidden
+        "404":
+          description: Pending invite not found
+      security:
+      - SessionCookie: []
+      summary: Resend a pending agent invite
+      tags:
+      - agents
+  /api/v1/agents/{id}/invite/cancel:
+    post:
+      description: "Privileged operators or the invite recipient can cancel a pending\
+        \ invite, freeing the seat and recording the reason in metadata and trust\
+        \ telemetry."
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_api_v1_agents__id__invite_cancel_post_request"
+        required: false
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentInviteCancelResponse"
+          description: Invite cancelled
+        "400":
+          description: Invalid agent id
+        "401":
+          description: Authentication required
+        "403":
+          description: Forbidden
+        "404":
+          description: Pending invite not found
+      security:
+      - SessionCookie: []
+      summary: Cancel a pending agent invite
+      tags:
+      - agents
+  /api/v1/agents/{id}/revoke:
+    post:
+      description: "Owner accounts or administrators revoke an agent identity, reclaiming\
+        \ the seat and revoking the associated API key."
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_api_v1_agents__id__revoke_post_request"
+        required: false
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentRevokeResponse"
+          description: Agent revoked
+        "401":
+          description: Authentication required
+        "403":
+          description: Forbidden
+        "404":
+          description: Agent not found
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: Revoke a registered agent
+      tags:
+      - agents
+  /api/v1/cases/{id}/versions/{v}/diff/{w}:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      - explode: false
+        in: path
+        name: v
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - explode: false
+        in: path
+        name: w
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          description: Diff result
+        "400":
+          description: Bad request
+        "401":
+          description: Auth required
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+      summary: Diff two case versions
+  /api/entitlement/test-write:
+    get:
+      responses:
+        "200":
+          description: Allowed
+        "401":
+          description: Auth required
+        "402":
+          description: Plan upgrade required
+      summary: Sample plan-gated endpoint
+  /api/v1/cases:
+    get:
+      parameters:
+      - explode: true
+        in: query
+        name: q
+        required: false
+        schema:
+          type: string
+        style: form
+      - explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          minimum: 1
+          type: integer
+        style: form
+      - explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          maximum: 100
+          minimum: 1
+          type: integer
+        style: form
+      responses:
+        "200":
+          description: Cases list
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      summary: List/search published cases
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_api_v1_cases_post_request"
+        required: true
+      responses:
+        "201":
+          description: Draft created
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: Create draft case
+  /api/v1/cases/mine:
+    get:
+      parameters:
+      - explode: true
+        in: query
+        name: q
+        required: false
+        schema:
+          type: string
+        style: form
+      - explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          minimum: 1
+          type: integer
+        style: form
+      - explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          maximum: 100
+          minimum: 1
+          type: integer
+        style: form
+      responses:
+        "200":
+          description: Caller-authored published cases list
+        "401":
+          description: Auth required
+      security:
+      - SessionCookie: []
+      summary: List my published cases
+  /api/v1/cases/search:
+    get:
+      parameters:
+      - explode: true
+        in: query
+        name: q
+        required: false
+        schema:
+          type: string
+        style: form
+      - explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          minimum: 1
+          type: integer
+        style: form
+      - explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          maximum: 100
+          minimum: 1
+          type: integer
+        style: form
+      responses:
+        "200":
+          description: Search results
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      summary: Search published cases (alias)
+  /api/v1/cases/{id}:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          description: Case
+        "401":
+          description: Auth required for unpublished
+        "403":
+          description: Forbidden for unpublished
+        "404":
+          description: Not found
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      summary: Get case by id
+    put:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_api_v1_cases__id__put_request"
+        required: true
+      responses:
+        "200":
+          description: Updated
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: Update draft/review case
+  /api/v1/cases/slug/{slug}:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: Set to application/qkey to receive  QKey JSON
+        explode: false
+        in: header
+        name: Accept
+        required: false
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          description: Case or QKey
+        "401":
+          description: Auth required for unpublished
+        "403":
+          description: Forbidden for unpublished
+        "404":
+          description: Not found
+        "406":
+          description: Not acceptable (QKey unavailable)
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      summary: Get case by slug (JSON or QKey)
+  /api/v1/cases/{id}/versions:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          description: Versions list
+      summary: List versions by case id
+  /api/v1/cases/slug/{slug}/versions:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          description: Versions list
+      summary: List versions by slug
+  /api/v1/cases/{id}/suggest:
+    post:
+      description: Authenticated users can suggest improvements. Published cases accept
+        suggestions from any user; unpublished cases restrict to the author or privileged
+        roles.
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseSuggestionRequest"
+        required: true
+      responses:
+        "202":
+          description: Suggestion accepted for review
+        "400":
+          description: Invalid payload
+        "401":
+          description: Authentication required
+        "403":
+          description: Forbidden for unpublished
+        "404":
+          description: Case not found
+        "429":
+          description: Rate limit exceeded
+      security:
+      - SessionCookie: []
+      summary: Submit a suggestion to improve a case
+  /api/v1/cases/{id}/submit:
+    post:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          description: Submitted
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: Submit draft for review
+  /api/v1/cases/{id}/publish:
+    post:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          description: Published
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      security:
+      - SessionCookie: []
+      summary: Publish case
+  /api/v1/collections:
+    get:
+      parameters:
+      - explode: true
+        in: query
+        name: ecosystem
+        required: false
+        schema:
+          type: string
+        style: form
+      - explode: true
+        in: query
+        name: domain
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Filter by minimum subscription tier
+        explode: true
+        in: query
+        name: tier
+        required: false
+        schema:
+          enum:
+          - free
+          - professional
+          - enterprise
+          type: string
+        style: form
+      - explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          minimum: 1
+          type: integer
+        style: form
+      - explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          maximum: 100
+          minimum: 1
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectionsResponse"
+          description: Collections list
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Auth required
+        "402":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanUpgradeRequired"
+          description: Plan upgrade required
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: List curated collections
+      tags:
+      - collections
+  /api/v1/collections/{id}:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectionDetail"
+          description: Collection detail
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Auth required
+        "402":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanUpgradeRequired"
+          description: Plan upgrade required
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: Get collection detail
+      tags:
+      - collections
+  /api/v1/collections/{id}/download:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      - explode: true
+        in: query
+        name: format
+        required: false
+        schema:
+          default: zip
+          enum:
+          - zip
+          - tar.gz
+          type: string
+        style: form
+      - explode: true
+        in: query
+        name: download_intent
+        required: true
+        schema:
+          enum:
+          - application
+          - research
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/zip: {}
+            application/gzip: {}
+          description: Collection archive
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Auth required
+        "402":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanUpgradeRequired"
+          description: Plan upgrade required
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: Download collection archive
+      tags:
+      - collections
+  /api/v1/cases/{case_id}/bundle:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: case_id
+        required: true
+        schema:
+          type: string
+        style: simple
+      - explode: true
+        in: query
+        name: format
+        required: false
+        schema:
+          default: zip
+          enum:
+          - zip
+          - tar.gz
+          type: string
+        style: form
+      - explode: true
+        in: query
+        name: download_intent
+        required: true
+        schema:
+          enum:
+          - application
+          - research
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/zip: {}
+            application/gzip: {}
+          description: Case bundle archive
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Auth required
+        "402":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanUpgradeRequired"
+          description: Plan upgrade required
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: Download case bundle archive
+      tags:
+      - bundles
+  /api/v1/bundles/{id}/manifest:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BundleManifest"
+          description: Bundle manifest
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Auth required
+        "402":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanUpgradeRequired"
+          description: Plan upgrade required
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: Get bundle manifest
+      tags:
+      - bundles
+  /api/v1/bundles/{id}/files:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BundleManifest"
+          description: Bundle files
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Auth required
+        "402":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanUpgradeRequired"
+          description: Plan upgrade required
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: List bundle files
+      tags:
+      - bundles
+  /api/v1/research/papers:
+    get:
+      parameters:
+      - explode: true
+        in: query
+        name: category
+        required: false
+        schema:
+          type: string
+        style: form
+      - explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          minimum: 1
+          type: integer
+        style: form
+      - explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          maximum: 100
+          minimum: 1
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResearchPapersResponse"
+          description: Research papers
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Auth required
+        "402":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanUpgradeRequired"
+          description: Plan upgrade required
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: List research papers
+      tags:
+      - research
+  /api/v1/research/papers/{id}/download:
+    get:
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      - explode: true
+        in: query
+        name: download_intent
+        required: true
+        schema:
+          enum:
+          - research
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/pdf: {}
+          description: Research PDF
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Auth required
+        "402":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanUpgradeRequired"
+          description: Plan upgrade required
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
+          description: Quota exceeded
+      security:
+      - SessionCookie: []
+      - ApiKeyAuth: []
+      summary: Download research paper
+      tags:
+      - research
+components:
+  schemas:
+    Case:
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        slug:
+          type: string
+        summary:
+          type: string
+        body: {}
+        status:
+          enum:
+          - draft
+          - review
+          - published
+          type: string
+        version:
+          type: integer
+        needs_review: {}
+        tags_csv: {}
+        sources_json: {}
+      type: object
+    CaseVersion:
+      properties:
+        version:
+          type: integer
+        content_hash:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+      type: object
+    QKeyCase:
+      description: ' QKey JSON representation (application/qkey)'
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        summary:
+          type: string
+        body: {}
+        version:
+          type: integer
+        tags:
+          items:
+            type: string
+          type: array
+        sources:
+          items:
+            type: object
+          type: array
+        status:
+          type: string
+      type: object
+    ApiKeyMasked:
+      properties:
+        id:
+          type: string
+        label: {}
+        last_used_at:
+          format: date-time
+        created_at:
+          format: date-time
+          type: string
+      type: object
+    QuotaExceeded:
+      example:
+        limit: 200
+        error: quota_exceeded
+        message: Daily quota exceeded for endpoint group
+        plan: free
+        reset_at: 2000-01-23T04:56:07.000+00:00
+        remaining: 0
+        group: cases_read
+      properties:
+        error:
+          example: quota_exceeded
+          type: string
+        message:
+          example: Daily quota exceeded for endpoint group
+          type: string
+        group:
+          example: cases_read
+          type: string
+        plan:
+          example: free
+          type: string
+        limit:
+          example: 200
+          type: integer
+        remaining:
+          example: 0
+          type: integer
+        reset_at:
+          format: date-time
+          type: string
+      required:
+      - error
+      - group
+      - limit
+      - plan
+      - remaining
+      - reset_at
+      type: object
+    UsageSelf:
+      example:
+        date: 2025-09-18
+        usage:
+        - limit: 200
+          used: 7
+          remaining: 193
+          group: cases_read
+        - limit: 200
+          used: 7
+          remaining: 193
+          group: cases_read
+        plan: free
+        reset_at: 2000-01-23T04:56:07.000+00:00
+        limits:
+          cases_read: 200
+          cases_write: 25
+      properties:
+        date:
+          example: 2025-09-18
+          type: string
+        plan:
+          example: free
+          type: string
+        limits:
+          additionalProperties: {}
+          example:
+            cases_read: 200
+            cases_write: 25
+          type: object
+        usage:
+          items:
+            $ref: "#/components/schemas/UsageSelf_usage_inner"
+          type: array
+        reset_at:
+          format: date-time
+          type: string
+      required:
+      - date
+      - limits
+      - plan
+      - reset_at
+      - usage
+      type: object
+    CollectionSummary:
+      example:
+        maintainers:
+        - contact: contact
+          name: name
+        - contact: contact
+          name: name
+        last_updated: 2000-01-23T04:56:07.000+00:00
+        ecosystem: ecosystem
+        description: description
+        created_at: 2000-01-23T04:56:07.000+00:00
+        published: true
+        version: version
+        case_count: 0
+        domain: ""
+        name: name
+        id: id
+        published_at: ""
+        tier_required: free
+        slug: slug
+        manifest_available: true
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        ecosystem:
+          type: string
+        domain: {}
+        version:
+          type: string
+        tier_required:
+          enum:
+          - free
+          - professional
+          - enterprise
+          type: string
+        case_count:
+          type: integer
+        published:
+          type: boolean
+        published_at:
+          format: date-time
+        created_at:
+          format: date-time
+          type: string
+        last_updated:
+          format: date-time
+          type: string
+        maintainers:
+          items:
+            $ref: "#/components/schemas/CollectionSummary_maintainers_inner"
+          type: array
+        manifest_available:
+          type: boolean
+      type: object
+    CollectionsResponse:
+      example:
+        data:
+        - maintainers:
+          - contact: contact
+            name: name
+          - contact: contact
+            name: name
+          last_updated: 2000-01-23T04:56:07.000+00:00
+          ecosystem: ecosystem
+          description: description
+          created_at: 2000-01-23T04:56:07.000+00:00
+          published: true
+          version: version
+          case_count: 0
+          domain: ""
+          name: name
+          id: id
+          published_at: ""
+          tier_required: free
+          slug: slug
+          manifest_available: true
+        - maintainers:
+          - contact: contact
+            name: name
+          - contact: contact
+            name: name
+          last_updated: 2000-01-23T04:56:07.000+00:00
+          ecosystem: ecosystem
+          description: description
+          created_at: 2000-01-23T04:56:07.000+00:00
+          published: true
+          version: version
+          case_count: 0
+          domain: ""
+          name: name
+          id: id
+          published_at: ""
+          tier_required: free
+          slug: slug
+          manifest_available: true
+        meta:
+          total: 5
+          limit: 1
+          page: 6
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/CollectionSummary"
+          type: array
+        meta:
+          $ref: "#/components/schemas/CollectionsResponse_meta"
+      type: object
+    CollectionCase:
+      example:
+        case_id: case_id
+        title: ""
+        order_index: 6
+      properties:
+        case_id:
+          type: string
+        title: {}
+        order_index:
+          type: integer
+      required:
+      - case_id
+      - order_index
+      type: object
+    CollectionDetail:
+      allOf:
+      - $ref: "#/components/schemas/CollectionSummary"
+      - properties:
+          cases:
+            items:
+              $ref: "#/components/schemas/CollectionCase"
+            type: array
+          manifest:
+            items:
+              $ref: "#/components/schemas/CollectionCase"
+            type: array
+          manifest_path: {}
+          manifest_sha256: {}
+        type: object
+      example:
+        maintainers:
+        - contact: contact
+          name: name
+        - contact: contact
+          name: name
+        last_updated: 2000-01-23T04:56:07.000+00:00
+        cases:
+        - case_id: case_id
+          title: ""
+          order_index: 6
+        - case_id: case_id
+          title: ""
+          order_index: 6
+        ecosystem: ecosystem
+        manifest_sha256: ""
+        manifest:
+        - case_id: case_id
+          title: ""
+          order_index: 6
+        - case_id: case_id
+          title: ""
+          order_index: 6
+        description: description
+        created_at: 2000-01-23T04:56:07.000+00:00
+        published: true
+        version: version
+        manifest_path: ""
+        case_count: 0
+        domain: ""
+        name: name
+        id: id
+        published_at: ""
+        tier_required: free
+        slug: slug
+        manifest_available: true
+    BundleFile:
+      example:
+        path: path
+        size_bytes: 6
+        checksum_sha256: checksum_sha256
+      properties:
+        path:
+          type: string
+        size_bytes:
+          type: integer
+        checksum_sha256:
+          type: string
+      required:
+      - checksum_sha256
+      - path
+      - size_bytes
+      type: object
+    BundleManifest:
+      example:
+        checksum_sha256: checksum_sha256
+        case_id: case_id
+        files:
+        - path: path
+          size_bytes: 6
+          checksum_sha256: checksum_sha256
+        - path: path
+          size_bytes: 6
+          checksum_sha256: checksum_sha256
+        id: id
+        archive_format: zip
+        version: 0
+      properties:
+        id:
+          type: string
+        case_id:
+          type: string
+        version:
+          type: integer
+        archive_format:
+          enum:
+          - zip
+          - tar.gz
+          type: string
+        checksum_sha256:
+          type: string
+        files:
+          items:
+            $ref: "#/components/schemas/BundleFile"
+          type: array
+      type: object
+    ResearchPaperSummary:
+      example:
+        summary: summary
+        asset_available: true
+        checksum_sha256: checksum_sha256
+        release_date: ""
+        id: id
+        published: true
+        title: title
+        category: category
+        published_at: ""
+        tier_required: professional
+        file_size_bytes: 0
+        slug: slug
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        category:
+          type: string
+        tier_required:
+          enum:
+          - professional
+          - enterprise
+          type: string
+        file_size_bytes:
+          type: integer
+        published:
+          type: boolean
+        published_at:
+          format: date-time
+        release_date:
+          format: date
+        checksum_sha256:
+          type: string
+        asset_available:
+          type: boolean
+      type: object
+    ResearchPapersResponse:
+      example:
+        data:
+        - summary: summary
+          asset_available: true
+          checksum_sha256: checksum_sha256
+          release_date: ""
+          id: id
+          published: true
+          title: title
+          category: category
+          published_at: ""
+          tier_required: professional
+          file_size_bytes: 0
+          slug: slug
+        - summary: summary
+          asset_available: true
+          checksum_sha256: checksum_sha256
+          release_date: ""
+          id: id
+          published: true
+          title: title
+          category: category
+          published_at: ""
+          tier_required: professional
+          file_size_bytes: 0
+          slug: slug
+        meta:
+          total: 5
+          limit: 1
+          page: 6
+      properties:
+        data:
+          items:
+            $ref: "#/components/schemas/ResearchPaperSummary"
+          type: array
+        meta:
+          $ref: "#/components/schemas/CollectionsResponse_meta"
+      type: object
+    ResearchAsset:
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        title:
+          type: string
+        tier_required:
+          type: string
+        file_path:
+          type: string
+        file_size_bytes:
+          type: integer
+        checksum_sha256:
+          type: string
+        metadata: {}
+      type: object
+    PlanUpgradeRequired:
+      example:
+        current_plan: free
+        error: plan_upgrade_required
+        required_feature: collections.read
+      properties:
+        error:
+          example: plan_upgrade_required
+          type: string
+        required_feature:
+          example: collections.read
+          type: string
+        current_plan:
+          example: free
+          type: string
+      required:
+      - current_plan
+      - error
+      - required_feature
+      type: object
+    ErrorResponse:
+      example:
+        message: auth required
+        error: unauthorized
+      properties:
+        message:
+          example: auth required
+          type: string
+        error:
+          example: unauthorized
+          type: string
+      required:
+      - message
+      type: object
+    AdminUsageGroup:
+      example:
+        total: 512
+        user_id: d5d8a6cf-3fef-4ea8-8d76-0a038c722c5b
+        count: 128
+        endpoint_group: cases_read
+      properties:
+        endpoint_group:
+          example: cases_read
+          type: string
+        count:
+          example: 128
+          type: integer
+        user_id:
+          example: d5d8a6cf-3fef-4ea8-8d76-0a038c722c5b
+        total:
+          example: 512
+      type: object
+    AdminUsageResponse:
+      example:
+        date: 2025-09-30
+        user_id: ""
+        groups:
+        - total: 512
+          user_id: d5d8a6cf-3fef-4ea8-8d76-0a038c722c5b
+          count: 128
+          endpoint_group: cases_read
+        - total: 512
+          user_id: d5d8a6cf-3fef-4ea8-8d76-0a038c722c5b
+          count: 128
+          endpoint_group: cases_read
+      properties:
+        date:
+          example: 2025-09-30
+          format: date
+          type: string
+        user_id:
+          example: null
+        groups:
+          items:
+            $ref: "#/components/schemas/AdminUsageGroup"
+          type: array
+      required:
+      - date
+      - groups
+      type: object
+    AgentChallenge:
+      example:
+        difficulty: 18
+        expires_at: 2025-10-03T18:25:43.511Z
+        invite_supported: true
+        challenge: 5c8f9f3a1b2c4d5e6f7081920a0b0c0d0e0f101112131415161718191a1b1c1d
+      properties:
+        challenge:
+          description: Hex-encoded PoW challenge token
+          example: 5c8f9f3a1b2c4d5e6f7081920a0b0c0d0e0f101112131415161718191a1b1c1d
+          type: string
+        difficulty:
+          description: Difficulty target expressed in leading zero bits
+          example: 18
+          type: integer
+        expires_at:
+          example: 2025-10-03T18:25:43.511Z
+          format: date-time
+          type: string
+        invite_supported:
+          description: Indicates whether the invite flow is available
+          example: true
+          type: boolean
+      required:
+      - challenge
+      - difficulty
+      - expires_at
+      - invite_supported
+      type: object
+    AgentRegistrationOwner:
+      example:
+        name: ""
+        email: email
+      properties:
+        name:
+          description: Owner display name used in invite email
+        email:
+          description: Owner email address that will receive the invite
+          format: email
+          type: string
+      required:
+      - email
+      type: object
+    AgentRegistrationRequest:
+      example:
+        public_key: public_key
+        owner:
+          name: ""
+          email: email
+        challenge: challenge
+        label: ""
+        nonce: AgentRegistrationRequest_nonce
+        delegated_token: ""
+      properties:
+        challenge:
+          description: Challenge value returned by GET /api/v1/registration/challenge
+          type: string
+        public_key:
+          description: Hex-encoded 32-byte public key
+          type: string
+        nonce:
+          $ref: "#/components/schemas/AgentRegistrationRequest_nonce"
+        label:
+          description: Optional human-friendly label for the agent
+        delegated_token:
+          description: Single-use delegated token issued by the owner. Not permitted
+            for invite flow.
+        owner:
+          $ref: "#/components/schemas/AgentRegistrationOwner"
+      required:
+      - challenge
+      - nonce
+      - public_key
+      type: object
+    AgentRegistrationActiveResponse:
+      example:
+        seat_usage: ""
+        seat_limit: ""
+        agent_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        api_key: api_key
+        owner_user_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        verified: true
+        scopes:
+        - scopes
+        - scopes
+        invite_name: ""
+        status: active
+        invite_email: ""
+      properties:
+        agent_id:
+          format: uuid
+          type: string
+        api_key:
+          description: Issued agent-scoped API key secret
+          type: string
+        scopes:
+          items:
+            type: string
+          type: array
+        verified:
+          description: Indicates whether the agent is auto-verified on creation
+          type: boolean
+        status:
+          description: Current lifecycle status
+          enum:
+          - active
+          type: string
+        owner_user_id:
+          description: Account that owns the agent
+          format: uuid
+          type: string
+        seat_usage:
+          description: Latest recorded seat usage for the owner
+        seat_limit:
+          description: Seat limit in effect for the owner
+        invite_email:
+          description: Invite email that claimed the agent (invite flow only)
+          format: email
+        invite_name:
+          description: Owner name associated with the invite flow
+      required:
+      - agent_id
+      - api_key
+      - owner_user_id
+      - scopes
+      - status
+      - verified
+      type: object
+    AgentRegistrationPendingResponse:
+      properties:
+        agent_id:
+          format: uuid
+          type: string
+        status:
+          enum:
+          - pending_owner
+          type: string
+        owner_email:
+          description: Owner email awaiting confirmation
+          format: email
+          type: string
+        invite_expires_at:
+          description: ISO timestamp when the invite expires
+          format: date-time
+          type: string
+        invite_delivery:
+          description: Primary delivery channel for the invite
+          enum:
+          - email
+          type: string
+        invite_token:
+          description: Invite token returned in non-production environments for testing
+      required:
+      - agent_id
+      - invite_delivery
+      - invite_expires_at
+      - owner_email
+      - status
+      type: object
+    AgentRegistrationResponse:
+      oneOf:
+      - $ref: "#/components/schemas/AgentRegistrationActiveResponse"
+      - $ref: "#/components/schemas/AgentRegistrationPendingResponse"
+    AgentInviteConfirmationRequest:
+      example:
+        invite_token: ""
+        token: token
+      properties:
+        token:
+          description: Invite token delivered via email
+          type: string
+        invite_token:
+          description: Alias for token supported for backward compatibility
+      required:
+      - token
+      type: object
+    DelegatedTokenRequest:
+      example:
+        scopes:
+        - scopes
+        - scopes
+        expires_in: ""
+      properties:
+        expires_in:
+          description: Requested TTL in seconds; server enforces configured bounds
+          maximum: 604800
+          minimum: 300
+        scopes:
+          description: Optional scopes list; only agent:register is currently supported
+          items:
+            type: string
+          type: array
+      type: object
+    DelegatedTokenResponse:
+      example:
+        expires_at: 2000-01-23T04:56:07.000+00:00
+        scopes:
+        - scopes
+        - scopes
+        delegated_token: delegated_token
+      properties:
+        delegated_token:
+          description: Secret token value (single use)
+          type: string
+        expires_at:
+          description: Expiration timestamp in ISO-8601
+          format: date-time
+          type: string
+        scopes:
+          description: Granted scopes (always agent:register for v1.0)
+          items:
+            type: string
+          type: array
+      required:
+      - delegated_token
+      - expires_at
+      - scopes
+      type: object
+    AgentRevokeResponse:
+      example:
+        seat_usage: ""
+        agent_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        owner_user_id: ""
+        status: revoked
+      properties:
+        agent_id:
+          format: uuid
+          type: string
+        status:
+          enum:
+          - revoked
+          type: string
+        owner_user_id:
+          format: uuid
+        seat_usage:
+          description: Current seat usage for the owner after revocation
+      required:
+      - agent_id
+      - status
+      type: object
+    PendingAgentInvite:
+      example:
+        invite_expires_at: ""
+        metadata:
+          key: ""
+        agent_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        registration_id: ""
+        created_at: ""
+        challenge_difficulty: ""
+        label: ""
+        resend_count: 0
+        invite_email: invite_email
+        expires_in_seconds: ""
+        is_expired: true
+        updated_at: ""
+        invite_last_sent_at: ""
+        invite_last_sent_by:
+          role: ""
+          user_id: ""
+        invite_name: ""
+        status: pending_owner
+      properties:
+        agent_id:
+          format: uuid
+          type: string
+        registration_id:
+          format: uuid
+        label:
+          description: Agent label recorded during invite creation
+        invite_email:
+          format: email
+          type: string
+        invite_name: {}
+        status:
+          enum:
+          - pending_owner
+          - active
+          - revoked
+          type: string
+        invite_expires_at:
+          format: date-time
+        created_at:
+          format: date-time
+        updated_at:
+          format: date-time
+        challenge_difficulty:
+          description: Proof-of-work difficulty tied to the invite challenge
+        metadata:
+          additionalProperties: true
+          description: Opaque metadata captured for invite lifecycle
+          type: object
+        is_expired:
+          type: boolean
+        resend_count:
+          type: integer
+        invite_last_sent_at:
+          format: date-time
+        invite_last_sent_by:
+          $ref: "#/components/schemas/PendingAgentInvite_invite_last_sent_by"
+        expires_in_seconds:
+          description: Remaining seconds until expiry (negative when expired)
+      required:
+      - agent_id
+      - invite_email
+      - is_expired
+      - resend_count
+      - status
+      type: object
+    PendingAgentInvitesResponse:
+      example:
+        pending:
+        - invite_expires_at: ""
+          metadata:
+            key: ""
+          agent_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          registration_id: ""
+          created_at: ""
+          challenge_difficulty: ""
+          label: ""
+          resend_count: 0
+          invite_email: invite_email
+          expires_in_seconds: ""
+          is_expired: true
+          updated_at: ""
+          invite_last_sent_at: ""
+          invite_last_sent_by:
+            role: ""
+            user_id: ""
+          invite_name: ""
+          status: pending_owner
+        - invite_expires_at: ""
+          metadata:
+            key: ""
+          agent_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          registration_id: ""
+          created_at: ""
+          challenge_difficulty: ""
+          label: ""
+          resend_count: 0
+          invite_email: invite_email
+          expires_in_seconds: ""
+          is_expired: true
+          updated_at: ""
+          invite_last_sent_at: ""
+          invite_last_sent_by:
+            role: ""
+            user_id: ""
+          invite_name: ""
+          status: pending_owner
+      properties:
+        pending:
+          items:
+            $ref: "#/components/schemas/PendingAgentInvite"
+          type: array
+      required:
+      - pending
+      type: object
+    AgentInviteResendResponse:
+      example:
+        invite:
+          invite_expires_at: ""
+          metadata:
+            key: ""
+          agent_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          registration_id: ""
+          created_at: ""
+          challenge_difficulty: ""
+          label: ""
+          resend_count: 0
+          invite_email: invite_email
+          expires_in_seconds: ""
+          is_expired: true
+          updated_at: ""
+          invite_last_sent_at: ""
+          invite_last_sent_by:
+            role: ""
+            user_id: ""
+          invite_name: ""
+          status: pending_owner
+      properties:
+        invite:
+          $ref: "#/components/schemas/PendingAgentInvite"
+      required:
+      - invite
+      type: object
+    AgentInviteCancelResponse:
+      example:
+        reason: ""
+        agent_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        invite_label: ""
+        registration_id: ""
+        invite_name: ""
+        invite_cancelled: true
+        status: revoked
+        invite_email: invite_email
+      properties:
+        agent_id:
+          format: uuid
+          type: string
+        registration_id:
+          format: uuid
+        status:
+          enum:
+          - revoked
+          type: string
+        invite_email:
+          format: email
+          type: string
+        invite_name: {}
+        invite_label: {}
+        invite_cancelled:
+          type: boolean
+        reason:
+          description: Operator provided cancellation reason
+      required:
+      - agent_id
+      - invite_cancelled
+      - invite_email
+      - status
+      type: object
+    CaseSuggestionRequest:
+      example:
+        suggestion: suggestion
+        contact: contact
+        fields:
+        - fields
+        - fields
+      properties:
+        suggestion:
+          description: Short description of the improvement or correction
+          minLength: 10
+          type: string
+        fields:
+          description: Optional list of fields the suggestion relates to
+          items:
+            type: string
+          type: array
+        contact:
+          description: Optional contact preference or note
+          type: string
+      required:
+      - suggestion
+      type: object
+    _api_auth_register_post_request:
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+      - email
+      - password
+      type: object
+    _api_auth_api_keys_get_200_response_keys_inner:
+      example:
+        last_used_at: ""
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: id
+        label: ""
+        scopes:
+        - scopes
+        - scopes
+      properties:
+        id:
+          type: string
+        label: {}
+        last_used_at:
+          format: date-time
+        created_at:
+          format: date-time
+          type: string
+        scopes:
+          items:
+            type: string
+          type: array
+      type: object
+    _api_auth_api_keys_get_200_response:
+      example:
+        keys:
+        - last_used_at: ""
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+          label: ""
+          scopes:
+          - scopes
+          - scopes
+        - last_used_at: ""
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+          label: ""
+          scopes:
+          - scopes
+          - scopes
+      properties:
+        keys:
+          items:
+            $ref: "#/components/schemas/_api_auth_api_keys_get_200_response_keys_inner"
+          type: array
+      type: object
+    _api_auth_api_keys_post_request:
+      properties:
+        label:
+          type: string
+        scopes:
+          description: Optional scopes to associate with key
+          items:
+            type: string
+          type: array
+      type: object
+    _api_auth_api_keys_post_201_response:
+      example:
+        api_key: api_key
+        id: id
+        label: ""
+        scopes:
+        - scopes
+        - scopes
+      properties:
+        id:
+          type: string
+        api_key:
+          type: string
+        label: {}
+        scopes:
+          items:
+            type: string
+          type: array
+      type: object
+    _api_billing_checkout_post_request:
+      properties:
+        plan:
+          enum:
+          - free
+          - professional
+          - enterprise
+          type: string
+        billing_cycle:
+          default: monthly
+          enum:
+          - monthly
+          - annual
+          type: string
+      required:
+      - plan
+      type: object
+    _api_admin_agent__id__exempt_post_request:
+      properties:
+        exempt:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - exempt
+      type: object
+    _api_v1_agents__id__invite_cancel_post_request:
+      properties:
+        reason:
+          description: Optional cancellation reason captured for audit trails
+          type: string
+      type: object
+    _api_v1_agents__id__revoke_post_request:
+      properties:
+        reason:
+          description: Optional reason for auditing purposes
+          type: string
+      type: object
+    _api_v1_cases_post_request:
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        summary:
+          type: string
+        body:
+          type: string
+        tags:
+          items:
+            type: string
+          type: array
+        sources:
+          items:
+            type: object
+          type: array
+      required:
+      - slug
+      - title
+      type: object
+    _api_v1_cases__id__put_request:
+      properties:
+        title:
+          type: string
+        summary:
+          type: string
+        body:
+          type: string
+        tags:
+          items:
+            type: string
+          type: array
+        sources:
+          items:
+            type: object
+          type: array
+      type: object
+    UsageSelf_usage_inner:
+      example:
+        limit: 200
+        used: 7
+        remaining: 193
+        group: cases_read
+      properties:
+        group:
+          example: cases_read
+          type: string
+        used:
+          example: 7
+          type: integer
+        limit:
+          example: 200
+        remaining:
+          example: 193
+      type: object
+    CollectionSummary_maintainers_inner:
+      example:
+        contact: contact
+        name: name
+      properties:
+        name:
+          type: string
+        contact:
+          type: string
+      type: object
+    CollectionsResponse_meta:
+      example:
+        total: 5
+        limit: 1
+        page: 6
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      type: object
+    AgentRegistrationRequest_nonce:
+      description: Nonce that satisfies PoW difficulty
+      oneOf:
+      - type: string
+      - type: integer
+    PendingAgentInvite_invite_last_sent_by:
+      additionalProperties: false
+      example:
+        role: ""
+        user_id: ""
+      properties:
+        user_id:
+          format: uuid
+        role: {}
+      type: object
+  securitySchemes:
+    SessionCookie:
+      description: Authenticated session cookie established via /api/auth/login
+      in: cookie
+      name: qid
+      type: apiKey
+    ApiKeyAuth:
+      description: "Use header: Authorization: Bearer <api_key>"
+      in: header
+      name: Authorization
+      type: apiKey
