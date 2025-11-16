@@ -1,0 +1,4198 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "QueryKey Cases API",
+    "version": "1.0.0",
+    "description": "API including QKey negotiation, version history, API keys (scopes, rotation, soft revoke), usage metering, billing stubs, plan gating, and login lockout mechanics."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local Dev"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "SessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "qid",
+        "description": "Authenticated session cookie established via /api/auth/login"
+      },
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Use header: Authorization: Bearer <api_key>"
+      }
+    },
+    "schemas": {
+      "Case": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "review",
+              "published"
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "needs_review": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "tags_csv": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sources_json": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CaseVersion": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer"
+          },
+          "content_hash": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "QKeyCase": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sources": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object"
+            }
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiKeyMasked": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "QuotaExceeded": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "quota_exceeded"
+          },
+          "message": {
+            "type": "string",
+            "example": "Daily quota exceeded for endpoint group"
+          },
+          "group": {
+            "type": "string",
+            "example": "cases_read"
+          },
+          "plan": {
+            "type": "string",
+            "example": "free"
+          },
+          "limit": {
+            "type": "integer",
+            "example": 200
+          },
+          "remaining": {
+            "type": "integer",
+            "example": 0
+          },
+          "reset_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "error",
+          "group",
+          "plan",
+          "limit",
+          "remaining",
+          "reset_at"
+        ]
+      },
+      "UsageSelf": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2025-09-18"
+          },
+          "plan": {
+            "type": "string",
+            "example": "free"
+          },
+          "limits": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "example": {
+              "cases_read": 200,
+              "cases_write": 25
+            }
+          },
+          "usage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "group": {
+                  "type": "string",
+                  "example": "cases_read"
+                },
+                "used": {
+                  "type": "integer",
+                  "example": 7
+                },
+                "limit": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "example": 200
+                },
+                "remaining": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "example": 193
+                }
+              }
+            }
+          },
+          "reset_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "date",
+          "plan",
+          "limits",
+          "usage",
+          "reset_at"
+        ]
+      },
+      "CollectionSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "type": "string"
+          },
+          "domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "tier_required": {
+            "type": "string",
+            "enum": [
+              "free",
+              "professional",
+              "enterprise"
+            ]
+          },
+          "case_count": {
+            "type": "integer"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_updated": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "maintainers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "contact": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "manifest_available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CollectionsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CollectionSummary"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "CollectionCase": {
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order_index": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "case_id",
+          "order_index"
+        ]
+      },
+      "CollectionDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CollectionSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "cases": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CollectionCase"
+                }
+              },
+              "manifest": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CollectionCase"
+                }
+              },
+              "manifest_path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "manifest_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "BundleFile": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer"
+          },
+          "checksum_sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "size_bytes",
+          "checksum_sha256"
+        ]
+      },
+      "BundleManifest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "case_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "archive_format": {
+            "type": "string",
+            "enum": [
+              "zip",
+              "tar.gz"
+            ]
+          },
+          "checksum_sha256": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BundleFile"
+            }
+          }
+        }
+      },
+      "ResearchPaperSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "tier_required": {
+            "type": "string",
+            "enum": [
+              "professional",
+              "enterprise"
+            ]
+          },
+          "file_size_bytes": {
+            "type": "integer"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "release_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "checksum_sha256": {
+            "type": "string"
+          },
+          "asset_available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ResearchPapersResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResearchPaperSummary"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "ResearchAsset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tier_required": {
+            "type": "string"
+          },
+          "file_path": {
+            "type": "string"
+          },
+          "file_size_bytes": {
+            "type": "integer"
+          },
+          "checksum_sha256": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        }
+      },
+      "PlanUpgradeRequired": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "plan_upgrade_required"
+          },
+          "required_feature": {
+            "type": "string",
+            "example": "collections.read"
+          },
+          "current_plan": {
+            "type": "string",
+            "example": "free"
+          }
+        },
+        "required": [
+          "error",
+          "required_feature",
+          "current_plan"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "auth required"
+          },
+          "error": {
+            "type": "string",
+            "example": "unauthorized"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "AdminUsageGroup": {
+        "type": "object",
+        "properties": {
+          "endpoint_group": {
+            "type": "string",
+            "example": "cases_read"
+          },
+          "count": {
+            "type": "integer",
+            "example": 128
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "d5d8a6cf-3fef-4ea8-8d76-0a038c722c5b"
+          },
+          "total": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "example": 512
+          }
+        }
+      },
+      "AdminUsageResponse": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2025-09-30"
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": null
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUsageGroup"
+            }
+          }
+        },
+        "required": [
+          "date",
+          "groups"
+        ]
+      },
+      "AgentChallenge": {
+        "type": "object",
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "example": "5c8f9f3a1b2c4d5e6f7081920a0b0c0d0e0f101112131415161718191a1b1c1d"
+          },
+          "difficulty": {
+            "type": "integer",
+            "example": 18
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-10-03T18:25:43.511Z"
+          },
+          "invite_supported": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "challenge",
+          "difficulty",
+          "expires_at",
+          "invite_supported"
+        ]
+      },
+      "AgentRegistrationOwner": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "AgentRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "challenge": {
+            "type": "string"
+          },
+          "public_key": {
+            "type": "string"
+          },
+          "nonce": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "delegated_token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AgentRegistrationOwner"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "challenge",
+          "public_key",
+          "nonce"
+        ]
+      },
+      "AgentRegistrationActiveResponse": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "api_key": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active"
+            ]
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seat_usage": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "seat_limit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "invite_email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email"
+          },
+          "invite_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "agent_id",
+          "api_key",
+          "scopes",
+          "verified",
+          "status",
+          "owner_user_id"
+        ]
+      },
+      "AgentRegistrationPendingResponse": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_owner"
+            ]
+          },
+          "owner_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "invite_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "invite_delivery": {
+            "type": "string",
+            "enum": [
+              "email"
+            ]
+          },
+          "invite_token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "agent_id",
+          "status",
+          "owner_email",
+          "invite_expires_at",
+          "invite_delivery"
+        ]
+      },
+      "AgentRegistrationResponse": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AgentRegistrationActiveResponse"
+          },
+          {
+            "$ref": "#/components/schemas/AgentRegistrationPendingResponse"
+          }
+        ]
+      },
+      "AgentInviteConfirmationRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "invite_token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "DelegatedTokenRequest": {
+        "type": "object",
+        "properties": {
+          "expires_in": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 300,
+            "maximum": 604800
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "DelegatedTokenResponse": {
+        "type": "object",
+        "properties": {
+          "delegated_token": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "delegated_token",
+          "expires_at",
+          "scopes"
+        ]
+      },
+      "AgentRevokeResponse": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "revoked"
+            ]
+          },
+          "owner_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "seat_usage": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "agent_id",
+          "status"
+        ]
+      },
+      "PendingAgentInvite": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "registration_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "invite_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "invite_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_owner",
+              "active",
+              "revoked"
+            ]
+          },
+          "invite_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "challenge_difficulty": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "is_expired": {
+            "type": "boolean"
+          },
+          "resend_count": {
+            "type": "integer"
+          },
+          "invite_last_sent_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "invite_last_sent_by": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "user_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "role": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "expires_in_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "agent_id",
+          "invite_email",
+          "status",
+          "is_expired",
+          "resend_count"
+        ]
+      },
+      "PendingAgentInvitesResponse": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingAgentInvite"
+            }
+          }
+        },
+        "required": [
+          "pending"
+        ]
+      },
+      "AgentInviteResendResponse": {
+        "type": "object",
+        "properties": {
+          "invite": {
+            "$ref": "#/components/schemas/PendingAgentInvite"
+          }
+        },
+        "required": [
+          "invite"
+        ]
+      },
+      "AgentInviteCancelResponse": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "registration_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "revoked"
+            ]
+          },
+          "invite_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "invite_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "invite_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "invite_cancelled": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "agent_id",
+          "status",
+          "invite_email",
+          "invite_cancelled"
+        ]
+      },
+      "CaseSuggestionRequest": {
+        "type": "object",
+        "properties": {
+          "suggestion": {
+            "type": "string",
+            "minLength": 10
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contact": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "suggestion"
+        ]
+      },
+      "CaseProvenanceVerification": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "resource": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "slug": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "current_version": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "identity_hash": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "enum": [
+              "recent",
+              "full"
+            ]
+          },
+          "window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 180
+          },
+          "hash_chain": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "valid",
+                  "partial",
+                  "broken",
+                  "missing"
+                ]
+              },
+              "chain_depth": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "head_hash": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "head_version": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "prev_hash": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "head_created_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "missing_hashes": {
+                "type": "boolean"
+              },
+              "linked": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "status",
+              "chain_depth",
+              "missing_hashes",
+              "linked"
+            ]
+          },
+          "bundle": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "verified",
+                  "partial",
+                  "missing"
+                ]
+              },
+              "format": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "size_bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "checksum_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last_verified_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "signatures": {
+            "type": "object",
+            "properties": {
+              "present": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "verified",
+                  "unchecked",
+                  "none"
+                ]
+              },
+              "algorithm": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last_signed_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "present",
+              "status"
+            ]
+          },
+          "trust_events": {
+            "type": "object",
+            "properties": {
+              "recent": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "event_type": {
+                      "type": "string"
+                    },
+                    "intent": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "event_type",
+                    "occurred_at"
+                  ]
+                }
+              },
+              "totals_last_window": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "penalties_active": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "recent",
+              "totals_last_window",
+              "penalties_active"
+            ]
+          },
+          "review": {
+            "type": "object",
+            "properties": {
+              "needs_review": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "needs_review",
+                  "clear"
+                ]
+              },
+              "last_reviewed_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "needs_review",
+              "status"
+            ]
+          },
+          "risk": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "caution",
+                  "blocked"
+                ]
+              },
+              "flags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "status",
+              "flags"
+            ]
+          },
+          "provenance_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "trusted",
+              "caution",
+              "blocked"
+            ]
+          },
+          "verified_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "ok",
+          "resource",
+          "detail",
+          "window_days",
+          "hash_chain",
+          "bundle",
+          "signatures",
+          "trust_events",
+          "review",
+          "risk",
+          "provenance_score",
+          "verdict",
+          "verified_at"
+        ]
+      },
+      "CaseVersionDiff": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "case_id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from_version": {
+            "type": "integer"
+          },
+          "to_version": {
+            "type": "integer"
+          },
+          "changed_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "diff": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "before": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array",
+                    "object",
+                    "null"
+                  ]
+                },
+                "after": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array",
+                    "object",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "field"
+              ]
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "case_id",
+          "from_version",
+          "to_version",
+          "changed_fields",
+          "diff"
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/healthz/auth": {
+      "get": {
+        "summary": "Auth subsystem health",
+        "responses": {
+          "200": {
+            "description": "Auth health payload"
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "summary": "Register user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Registered"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Login (with lockout)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session established"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "423": {
+            "description": "Account temporarily locked"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Logout",
+        "responses": {
+          "200": {
+            "description": "Logged out"
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "summary": "Session info",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user"
+          },
+          "401": {
+            "description": "Not authenticated"
+          }
+        }
+      }
+    },
+    "/api/auth/api-keys": {
+      "post": {
+        "summary": "Create API key",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Optional scopes to associate with key"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Key created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "api_key": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Auth required"
+          }
+        }
+      },
+      "get": {
+        "summary": "List API keys",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "last_used_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "scopes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Auth required"
+          }
+        }
+      }
+    },
+    "/api/auth/api-keys/{id}": {
+      "delete": {
+        "summary": "Soft revoke API key",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked (soft)"
+          }
+        }
+      },
+      "post": {
+        "summary": "Rotate API key (alias: /rotate)",
+        "deprecated": true,
+        "responses": {
+          "405": {
+            "description": "Use /rotate subresource"
+          }
+        }
+      }
+    },
+    "/api/auth/api-keys/{id}/rotate": {
+      "post": {
+        "summary": "Rotate API key",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rotated - returns new secret"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "Fetch OpenAPI spec (ETag)",
+        "responses": {
+          "200": {
+            "description": "Spec JSON"
+          },
+          "304": {
+            "description": "Not Modified"
+          }
+        }
+      }
+    },
+    "/api/": {
+      "get": {
+        "summary": "Capability descriptor",
+        "responses": {
+          "200": {
+            "description": "Capabilities"
+          }
+        }
+      }
+    },
+    "/api/billing/checkout": {
+      "post": {
+        "summary": "Create checkout session (mock if no Stripe)",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "plan"
+                ],
+                "properties": {
+                  "plan": {
+                    "type": "string",
+                    "enum": [
+                      "free",
+                      "professional",
+                      "enterprise"
+                    ]
+                  },
+                  "billing_cycle": {
+                    "type": "string",
+                    "enum": [
+                      "monthly",
+                      "annual"
+                    ],
+                    "default": "monthly"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Checkout URL"
+          },
+          "401": {
+            "description": "Auth required"
+          }
+        }
+      }
+    },
+    "/api/billing/portal": {
+      "get": {
+        "summary": "Customer portal link (mock if no Stripe)",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Portal URL"
+          },
+          "401": {
+            "description": "Auth required"
+          }
+        }
+      }
+    },
+    "/api/billing/webhook": {
+      "post": {
+        "summary": "Billing webhook (Stripe events)",
+        "responses": {
+          "200": {
+            "description": "Processed & verified"
+          },
+          "202": {
+            "description": "Received but ignored (not allowlisted)"
+          },
+          "400": {
+            "description": "Signature invalid"
+          }
+        }
+      }
+    },
+    "/api/admin/reload-config": {
+      "post": {
+        "summary": "Reload plan & quota config",
+        "responses": {
+          "200": {
+            "description": "Config reloaded"
+          },
+          "401": {
+            "description": "Auth required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/usage": {
+      "get": {
+        "summary": "Admin usage aggregate (today or ?day=YYYY-MM-DD, optional ?user_id=UUID)",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Date in YYYY-MM-DD format"
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter results to a single user id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregated usage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUsageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Auth required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/agent/{id}": {
+      "get": {
+        "summary": "Get agent details and recent exempt audit events",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent details and audits"
+          },
+          "401": {
+            "description": "Auth required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/admin/agent/{id}/exempt/audit": {
+      "get": {
+        "summary": "Get full audit history for agent exemption toggles",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit list"
+          },
+          "401": {
+            "description": "Auth required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/agent/{id}/exempt": {
+      "post": {
+        "summary": "Set or clear agent exempt flag (admin-only)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "exempt": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "exempt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exempt toggled"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Auth required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/cases": {
+      "get": {
+        "summary": "Admin list cases (recent)",
+        "responses": {
+          "200": {
+            "description": "Cases listed"
+          },
+          "401": {
+            "description": "Auth required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/usage/me": {
+      "get": {
+        "summary": "Today's usage & plan limits for authenticated user",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSelf"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Auth required"
+          }
+        }
+      }
+    },
+    "/api/v1/registration/challenge": {
+      "get": {
+        "summary": "Issue Proof-of-Work challenge for agent registration",
+        "description": "Issue a short-lived challenge used to prove computational work before registering a new agent identity. Authenticated owners receive challenges tied to their account; unauthenticated callers must pass invite=true to initiate the email invite flow.",
+        "tags": [
+          "agents"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "name": "difficulty",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            },
+            "description": "Optional difficulty override; final difficulty may be clamped by the server"
+          },
+          {
+            "name": "invite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Set to true when requesting a challenge for invite-based onboarding without an authenticated owner session"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Challenge issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentChallenge"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid difficulty"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
+    "/api/v1/registration/agent": {
+      "post": {
+        "summary": "Validate PoW solution and register new agent",
+        "description": "Completes the Proof-of-Work onboarding flow. Authenticated owners receive an agent key immediately when capacity allows; unauthenticated callers provide owner contact info and trigger an invite email for later confirmation.",
+        "tags": [
+          "agents"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Agent registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRegistrationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload or PoW solution"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Seat capacity or plan constraints prevented registration"
+          },
+          "404": {
+            "description": "Challenge not found"
+          },
+          "409": {
+            "description": "Conflict: challenge already solved or public key registered"
+          },
+          "429": {
+            "description": "Registration rate limit reached"
+          }
+        }
+      }
+    },
+    "/api/v1/registration/delegated-token": {
+      "post": {
+        "summary": "Issue single-use delegated registration token",
+        "description": "Authenticated owners can mint a short-lived delegated token that authorizes a CI/CD workflow to register an agent on their behalf.",
+        "tags": [
+          "agents"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DelegatedTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Delegated token issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelegatedTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Seat capacity or plan constraints prevented issuance"
+          }
+        }
+      }
+    },
+    "/api/v1/registration/invite/confirm": {
+      "post": {
+        "summary": "Confirm an agent invite and activate ownership",
+        "description": "Owners confirm invite tokens delivered via email, binding the pending agent to their account and provisioning credentials.",
+        "tags": [
+          "agents"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentInviteConfirmationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invite confirmed and agent activated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRegistrationActiveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid invite token"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Seat capacity or plan constraints prevented activation"
+          },
+          "404": {
+            "description": "Invite token not found"
+          },
+          "409": {
+            "description": "Invite already claimed or agent inactive"
+          },
+          "410": {
+            "description": "Invite token expired"
+          }
+        }
+      }
+    },
+    "/api/v1/agents/pending": {
+      "get": {
+        "summary": "List pending agent invites",
+        "description": "Operators or invite recipients list pending owner-bound agent invitations with optional filters for email, pagination, and expiry state.",
+        "tags": [
+          "agents"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "include_expired",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "description": "Include invites that have already expired."
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Restrict results to the provided invite email."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250
+            },
+            "description": "Page size (defaults to 50)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Offset into the pending invite list."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending invites returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingAgentInvitesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden for principals without invite visibility"
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{id}/invite/resend": {
+      "post": {
+        "summary": "Resend a pending agent invite",
+        "description": "Privileged operators or the invite recipient can regenerate the invite token, extend expiry, and trigger the invite email delivery.",
+        "tags": [
+          "agents"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invite resent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInviteResendResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid agent id"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Pending invite not found"
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{id}/invite/cancel": {
+      "post": {
+        "summary": "Cancel a pending agent invite",
+        "description": "Privileged operators or the invite recipient can cancel a pending invite, freeing the seat and recording the reason in metadata and trust telemetry.",
+        "tags": [
+          "agents"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "description": "Optional cancellation reason captured for audit trails"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invite cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInviteCancelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid agent id"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Pending invite not found"
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{id}/revoke": {
+      "post": {
+        "summary": "Revoke a registered agent",
+        "description": "Owner accounts or administrators revoke an agent identity, reclaiming the seat and revoking the associated API key.",
+        "tags": [
+          "agents"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "description": "Optional reason for auditing purposes"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRevokeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Agent not found"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{id}/versions/{v}/diff/{w}": {
+      "get": {
+        "summary": "Diff two case versions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "v",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "w",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diff result"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Auth required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/entitlement/test-write": {
+      "get": {
+        "summary": "Sample plan-gated endpoint",
+        "responses": {
+          "200": {
+            "description": "Allowed"
+          },
+          "401": {
+            "description": "Auth required"
+          },
+          "402": {
+            "description": "Plan upgrade required"
+          }
+        }
+      }
+    },
+    "/api/v1/cases": {
+      "get": {
+        "summary": "List/search published cases",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cases list"
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create draft case",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "slug"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "sources": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Draft created"
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/mine": {
+      "get": {
+        "summary": "List my published cases",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Caller-authored published cases list"
+          },
+          "401": {
+            "description": "Auth required"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/search": {
+      "get": {
+        "summary": "Search published cases (alias)",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results"
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{id}": {
+      "get": {
+        "summary": "Get case by id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Case"
+          },
+          "401": {
+            "description": "Auth required for unpublished"
+          },
+          "403": {
+            "description": "Forbidden for unpublished"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update draft/review case",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "sources": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated"
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/slug/{slug}": {
+      "get": {
+        "summary": "Get case by slug (JSON or QKey)",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Set to application/qkey to receive  QKey JSON"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Case or QKey"
+          },
+          "401": {
+            "description": "Auth required for unpublished"
+          },
+          "403": {
+            "description": "Forbidden for unpublished"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "406": {
+            "description": "Not acceptable (QKey unavailable)"
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{id}/versions": {
+      "get": {
+        "summary": "List versions by case id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versions list"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/slug/{slug}/versions": {
+      "get": {
+        "summary": "List versions by slug",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versions list"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{id}/versions/diff": {
+      "get": {
+        "summary": "Summarize changes between two versions by case id",
+        "tags": [
+          "cases"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Starting version number"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Target version number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diff summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseVersionDiff"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid version parameters"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Case or version not found"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/slug/{slug}/versions/diff": {
+      "get": {
+        "summary": "Summarize changes between two versions by slug",
+        "tags": [
+          "cases"
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diff summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseVersionDiff"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid version parameters"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Case or version not found"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{id}/verify": {
+      "get": {
+        "summary": "Verify case provenance and integrity",
+        "tags": [
+          "cases"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "detail",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recent",
+                "full"
+              ]
+            },
+            "description": "recent (default) returns the last 5 trust events. full returns 10."
+          },
+          {
+            "name": "window_days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 180
+            },
+            "description": "Rolling window for trust telemetry aggregation (default 30)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provenance verification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseProvenanceVerification"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/slug/{slug}/verify": {
+      "get": {
+        "summary": "Verify case provenance and integrity by slug",
+        "tags": [
+          "cases"
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "detail",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recent",
+                "full"
+              ]
+            }
+          },
+          {
+            "name": "window_days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 180
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provenance verification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseProvenanceVerification"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{id}/suggest": {
+      "post": {
+        "summary": "Submit a suggestion to improve a case",
+        "description": "Authenticated users can suggest improvements. Published cases accept suggestions from any user; unpublished cases restrict to the author or privileged roles.",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseSuggestionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Suggestion accepted for review"
+          },
+          "400": {
+            "description": "Invalid payload"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden for unpublished"
+          },
+          "404": {
+            "description": "Case not found"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{id}/submit": {
+      "post": {
+        "summary": "Submit draft for review",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Submitted"
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{id}/publish": {
+      "post": {
+        "summary": "Publish case",
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published"
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/collections": {
+      "get": {
+        "summary": "List curated collections",
+        "tags": [
+          "collections"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ecosystem",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "domain",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tier",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "free",
+                "professional",
+                "enterprise"
+              ]
+            },
+            "description": "Filter by minimum subscription tier"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collections list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Auth required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan upgrade required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanUpgradeRequired"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/collections/{id}": {
+      "get": {
+        "summary": "Get collection detail",
+        "tags": [
+          "collections"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Auth required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan upgrade required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanUpgradeRequired"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/collections/{id}/download": {
+      "get": {
+        "summary": "Download collection archive",
+        "tags": [
+          "collections"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "zip",
+                "tar.gz"
+              ],
+              "default": "zip"
+            }
+          },
+          {
+            "in": "query",
+            "name": "download_intent",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "application",
+                "research"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection archive",
+            "content": {
+              "application/zip": {},
+              "application/gzip": {}
+            }
+          },
+          "401": {
+            "description": "Auth required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan upgrade required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanUpgradeRequired"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/bundle": {
+      "get": {
+        "summary": "Download case bundle archive",
+        "tags": [
+          "bundles"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "zip",
+                "tar.gz"
+              ],
+              "default": "zip"
+            }
+          },
+          {
+            "in": "query",
+            "name": "download_intent",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "application",
+                "research"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Case bundle archive",
+            "content": {
+              "application/zip": {},
+              "application/gzip": {}
+            }
+          },
+          "401": {
+            "description": "Auth required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan upgrade required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanUpgradeRequired"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bundles/{id}/manifest": {
+      "get": {
+        "summary": "Get bundle manifest",
+        "tags": [
+          "bundles"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bundle manifest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleManifest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Auth required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan upgrade required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanUpgradeRequired"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bundles/{id}/files": {
+      "get": {
+        "summary": "List bundle files",
+        "tags": [
+          "bundles"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bundle files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleManifest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Auth required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan upgrade required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanUpgradeRequired"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/research/papers": {
+      "get": {
+        "summary": "List research papers",
+        "tags": [
+          "research"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Research papers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchPapersResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Auth required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan upgrade required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanUpgradeRequired"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/research/papers/{id}/download": {
+      "get": {
+        "summary": "Download research paper",
+        "tags": [
+          "research"
+        ],
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "download_intent",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "research"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Research PDF",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "description": "Auth required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan upgrade required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanUpgradeRequired"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaExceeded"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [],
+  "tags": [
+    {
+      "name": "auth"
+    },
+    {
+      "name": "cases"
+    },
+    {
+      "name": "qkey"
+    },
+    {
+      "name": "collections"
+    },
+    {
+      "name": "bundles"
+    },
+    {
+      "name": "research"
+    },
+    {
+      "name": "agents"
+    }
+  ]
+}
