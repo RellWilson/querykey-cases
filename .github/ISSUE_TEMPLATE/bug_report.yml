@@ -1,0 +1,19 @@
+name: Bug report
+description: Report a problem using QueryKey
+labels: [bug]
+body:
+  - type: input
+    id: area
+    attributes: { label: Area, placeholder: "API, Docs, SDK" }
+  - type: textarea
+    id: repro
+    attributes: { label: Reproduction steps }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected behavior }
+  - type: textarea
+    id: actual
+    attributes: { label: Actual behavior }
+  - type: input
+    id: request-id
+    attributes: { label: Request ID, placeholder: "req_..." }

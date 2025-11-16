@@ -1,0 +1,4 @@
+- [ ] No server/infra code added
+- [ ] Automated Trust Protocol is only mentioned by name (no technical details)
+- [ ] Examples use YOUR_TOKEN placeholder
+- [ ] No ATP technical blueprint added to docs (algorithms, targets, scoring, penalties)
