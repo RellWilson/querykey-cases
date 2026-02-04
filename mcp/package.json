@@ -1,13 +1,23 @@
 {
-  "name": "querykey-mcp-server",
-  "private": true,
+  "name": "@querykey/mcp-adapter",
+  "private": false,
   "type": "module",
   "version": "0.1.0",
-  "description": "Model Context Protocol (MCP) server for QueryKey Cases",
+  "description": "Model Context Protocol adapter for QueryKey Cases (stdio + JSON-RPC fallback)",
   "main": "server.mjs",
+  "bin": {
+    "querykey-mcp-adapter": "./bin/querykey-mcp-adapter.mjs"
+  },
+  "files": [
+    "server.mjs",
+    "tools.mjs",
+    "adapter-version.json",
+    "bin"
+  ],
   "scripts": {
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
+    "bundle": "node scripts/build-bundle.mjs",
     "lint": "eslint . --ext .js,.mjs --max-warnings=0",
     "test": "node --test"
   },

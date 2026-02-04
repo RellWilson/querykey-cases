@@ -1,13 +1,26 @@
 /**
- * ==========================================================================
- * mcp/tools.mjs
- *
- * @fileOverview
- * Shared tool schemas and HTTP helpers for MCP server; exported so tests can
- * invoke handlers without spinning the full stdio transport.
- * ==========================================================================
- */
+==========================================================================
+@fileOverview
+Shared tool schemas and HTTP helpers for MCP server; exported so tests can
+invoke handlers without spinning the full stdio transport.
+@author
+QueryKey Platform SRE Guild – Contact@QueryKey.com
+@maintainer
+Platform Integrations (MCP)
+@usage
+Import helper functions inside MCP adapters and tests without booting the stdio transport.
+@dependencies
+zod, fetch (global)
+@notes
+Adds consent helpers to gate telemetry and exposes consent endpoints for adapters.
+@timestamp
+2026-02-09T00:00:00Z
+==========================================================================*/
 import { z } from 'zod';
+
+// Runtime-safe constants; avoid TS-only "as const" syntax.
+const CONSENT_CATEGORIES = Object.freeze(['functional', 'analytics', 'personalization', 'automation']);
+const CONSENT_STATUS = Object.freeze(['granted', 'denied', 'pending']);
 
 /**
  * Resolve candidate base URLs in priority order.
@@ -152,6 +165,33 @@ async function httpPost(pathname, json) {
   throw lastErr || new Error('All base URLs failed for POST ' + pathname);
 }
 
+function normalizeConsentSnapshot(snapshot = {}) {
+  const categories = {};
+  CONSENT_CATEGORIES.forEach((category) => {
+    const status = snapshot?.categories?.[category];
+    if (CONSENT_STATUS.includes(status)) categories[category] = status;
+  });
+  return {
+    categories,
+    consent_id: snapshot?.consent_id || snapshot?.consentId,
+    schema_version: snapshot?.schema_version || snapshot?.schemaVersion,
+    jurisdiction: snapshot?.jurisdiction,
+    updated_at: snapshot?.updated_at || snapshot?.updatedAt
+  };
+}
+
+function telemetryAllowed(snapshot) {
+  const categories = snapshot?.categories || {};
+  return categories.analytics === 'granted' || categories.automation === 'granted';
+}
+
+export function ensureTelemetryAllowed(snapshot) {
+  if (telemetryAllowed(snapshot)) return true;
+  const err = new Error('We need your permission to run analytics before sending telemetry. Please update your consent preferences to continue.');
+  err.code = 'consent_required';
+  throw err;
+}
+
 export const SearchCasesInput = z.object({ q: z.string().min(1), limit: z.number().int().min(1).max(100).optional(), page: z.number().int().min(1).optional() });
 export const GetCaseInput = z.object({ id: z.string().min(1) }).or(z.object({ slug: z.string().min(1) }));
 export const ListCollectionsInput = z.object({ q: z.string().optional(), page: z.number().int().min(1).optional(), limit: z.number().int().min(1).max(100).optional() });
@@ -175,6 +215,19 @@ export const TrustEventsInput = z.object({
   window_days: z.number().int().min(1).max(365).optional()
 });
 export const CapabilitiesInput = z.object({}).optional();
+export const ConsentCategoriesInput = z.object({
+  functional: z.enum(CONSENT_STATUS).optional(),
+  analytics: z.enum(CONSENT_STATUS).optional(),
+  personalization: z.enum(CONSENT_STATUS).optional(),
+  automation: z.enum(CONSENT_STATUS).optional()
+});
+export const ConsentUpdateInput = z.object({
+  categories: ConsentCategoriesInput.optional(),
+  jurisdiction_override: z.string().min(2).optional(),
+  age_bracket: z.string().optional(),
+  consent_id: z.string().optional(),
+  schema_version: z.string().optional()
+});
 
 export async function toolSearchCases({ q, limit = 10, page = 1 }) {
   return httpGet('/api/v1/cases', { q, limit, page });
@@ -219,4 +272,17 @@ export async function toolGetCapabilities() {
       return { plan: 'unknown', features: {}, capabilities: {} };
     }
   }
+}
+
+export async function toolGetConsent(opts = {}) {
+  const allowNotFound = opts.allowNotFound !== undefined ? opts.allowNotFound : true;
+  const res = await httpGet('/api/v1/consent', {}, { allowNotFound });
+  if (res && res.ok === false && res.status === 404) return res;
+  return normalizeConsentSnapshot(res || {});
+}
+
+export async function toolUpdateConsent(payload = {}) {
+  const parsed = ConsentUpdateInput.parse(payload || {});
+  const res = await httpPost('/api/v1/consent', parsed);
+  return normalizeConsentSnapshot(res || {});
 }
